@@ -10,10 +10,12 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from .__about__ import __version__
+
 app = FastAPI(
     title="Gemini CLI Wrapper",
     description="OpenAI-compatible API wrapper for Gemini CLI",
-    version="1.0.0",
+    version=__version__,
 )
 
 
@@ -328,7 +330,55 @@ async def health_check():
     return {"status": "healthy", "service": "gemini-cli-wrapper"}
 
 
-if __name__ == "__main__":
-    import uvicorn
+def main():
+    """Main entry point for the application."""
+    import argparse
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import uvicorn
+    
+    parser = argparse.ArgumentParser(
+        description="Gemini CLI Wrapper - OpenAI-compatible API server"
+    )
+    parser.add_argument(
+        "--host", 
+        default="0.0.0.0", 
+        help="Host to bind the server to (default: 0.0.0.0)"
+    )
+    parser.add_argument(
+        "--port", 
+        type=int, 
+        default=8000, 
+        help="Port to bind the server to (default: 8000)"
+    )
+    parser.add_argument(
+        "--reload", 
+        action="store_true", 
+        help="Enable auto-reload for development"
+    )
+    parser.add_argument(
+        "--version", 
+        action="version", 
+        version=f"gemini-cli-wrapper {__version__}"
+    )
+    
+    args = parser.parse_args()
+    
+    print(f"Starting Gemini CLI Wrapper v{__version__}")
+    print(f"Server will be available at http://{args.host}:{args.port}")
+    print("OpenAI-compatible endpoints:")
+    print(f"  - Chat completions: http://{args.host}:{args.port}/v1/chat/completions")
+    print(f"  - Text completions: http://{args.host}:{args.port}/v1/completions")
+    print(f"  - Models: http://{args.host}:{args.port}/v1/models")
+    print(f"  - Health check: http://{args.host}:{args.port}/health")
+    print()
+    
+    uvicorn.run(
+        app, 
+        host=args.host, 
+        port=args.port, 
+        reload=args.reload
+    )
+
+
+if __name__ == "__main__":
+    main()

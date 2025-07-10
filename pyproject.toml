@@ -1,11 +1,97 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "gemini-cli-wrapper"
-version = "0.1.0"
-description = "Add your description here"
+dynamic = ["version"]
+description = "OpenAI-compatible API wrapper for Gemini CLI"
 readme = "README.md"
 requires-python = ">=3.13"
+license = "MIT"
+authors = [
+    { name = "TKHuang", email = "tkhuang@gmail.com" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+]
 dependencies = [
     "fastapi>=0.116.0",
     "uvicorn>=0.30.0",
     "pydantic>=2.0.0",
+    "hatch>=1.14.1",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "ruff>=0.6.0",
+]
+
+[project.scripts]
+gemini-cli-wrapper = "gemini_cli_wrapper.main:main"
+
+[project.urls]
+Documentation = "https://github.com/tkhuang/gemini_cli_wrapper#readme"
+Issues = "https://github.com/tkhuang/gemini_cli_wrapper/issues"
+Source = "https://github.com/tkhuang/gemini_cli_wrapper"
+
+[tool.hatch.version]
+path = "gemini_cli_wrapper/__about__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["gemini_cli_wrapper"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "gemini_cli_wrapper/",
+    "README.md",
+    "pyproject.toml",
+]
+
+[tool.hatch.envs.default]
+dependencies = [
+    "pytest",
+    "ruff",
+]
+
+[tool.hatch.envs.default.scripts]
+format = "ruff format ."
+lint = "ruff check ."
+lint-fix = "ruff check --fix ."
+check = ["lint", "format --check"]
+
+
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+fix = true
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "C4",  # flake8-comprehensions
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long, handled by formatter
+    "B008",  # do not perform function calls in argument defaults
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["main"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
