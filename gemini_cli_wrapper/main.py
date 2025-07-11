@@ -176,7 +176,7 @@ async def call_gemini_cli(model: str, prompt: str, **kwargs) -> str:
         logger.debug(
             f"Cleaned output length: {len(cleaned_output)} characters: \n{cleaned_output}"
         )
-
+        
         return cleaned_output
 
     except FileNotFoundError as e:
@@ -286,10 +286,14 @@ async def create_chat_completion(request: ChatCompletionRequest):
 
         # For streaming responses
         async def generate_stream():
-            # Split response into chunks for streaming effect
-            words = response_text.split()
-            logger.debug(f"Streaming {len(words)} words")
-            for i, word in enumerate(words):
+            # Stream by characters to preserve formatting
+            chunk_size = 10  # Stream characters in small chunks
+            logger.debug(f"Streaming {len(response_text)} characters in chunks of {chunk_size}")
+            
+            for i in range(0, len(response_text), chunk_size):
+                chunk = response_text[i:i + chunk_size]
+                is_last = i + chunk_size >= len(response_text)
+                
                 chunk_data = {
                     "id": completion_id,
                     "object": "chat.completion.chunk",
@@ -299,21 +303,21 @@ async def create_chat_completion(request: ChatCompletionRequest):
                         {
                             "index": 0,
                             "delta": {
-                                "content": word + " " if i < len(words) - 1 else word
+                                "content": chunk
                             },
-                            "finish_reason": None if i < len(words) - 1 else "stop",
+                            "finish_reason": "stop" if is_last else None,
                         }
                     ],
                 }
                 yield f"data: {json.dumps(chunk_data)}\n\n"
-                await asyncio.sleep(0.05)  # Small delay for streaming effect
+                await asyncio.sleep(0.02)  # Small delay for smooth streaming
 
             logger.debug("Finished streaming response")
             yield "data: [DONE]\n\n"
 
         return StreamingResponse(
             generate_stream(),
-            media_type="text/plain",
+            media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
         )
     else:
@@ -369,9 +373,14 @@ async def create_completion(request: CompletionRequest):
 
         # For streaming responses
         async def generate_stream():
-            words = response_text.split()
-            logger.debug(f"Streaming {len(words)} words")
-            for i, word in enumerate(words):
+            # Stream by characters to preserve formatting
+            chunk_size = 10  # Stream characters in small chunks
+            logger.debug(f"Streaming {len(response_text)} characters in chunks of {chunk_size}")
+            
+            for i in range(0, len(response_text), chunk_size):
+                chunk = response_text[i:i + chunk_size]
+                is_last = i + chunk_size >= len(response_text)
+                
                 chunk_data = {
                     "id": completion_id,
                     "object": "text_completion",
@@ -380,20 +389,20 @@ async def create_completion(request: CompletionRequest):
                     "choices": [
                         {
                             "index": 0,
-                            "text": word + " " if i < len(words) - 1 else word,
-                            "finish_reason": None if i < len(words) - 1 else "stop",
+                            "text": chunk,
+                            "finish_reason": "stop" if is_last else None,
                         }
                     ],
                 }
                 yield f"data: {json.dumps(chunk_data)}\n\n"
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(0.02)
 
             logger.debug("Finished streaming response")
             yield "data: [DONE]\n\n"
 
         return StreamingResponse(
             generate_stream(),
-            media_type="text/plain",
+            media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
         )
     else:
@@ -427,9 +436,6 @@ async def health_check():
     """Health check endpoint"""
     logger.debug("Health check requested")
     return {"status": "healthy", "service": "gemini-cli-wrapper"}
-
-
-
 
 
 def main():

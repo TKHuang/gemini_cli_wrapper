@@ -99,6 +99,8 @@ health:
 	@echo "Make sure the server is running first with 'make dev' or 'make run'"
 	@curl -s http://localhost:8000/health | python -m json.tool || echo "Server not responding"
 
+
+
 # Utility commands
 clean:
 	@echo "Cleaning cache and temporary files..."
