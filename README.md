@@ -16,12 +16,28 @@ An OpenAI-compatible API wrapper for the Gemini CLI that provides REST endpoints
 
 ## Installation
 
+### From Source (Recommended for Development)
+
+```bash
+# Clone the repository
+git clone https://github.com/tkhuang/gemini-cli-wrapper.git
+cd gemini-cli-wrapper
+
+# Install dependencies with uv
+make install
+
+# Or manually with uv
+uv sync
+```
+
+### From PyPI
+
 ```bash
 # Install the package
 pip install gemini-cli-wrapper
 
 # Or install from source
-pip install git+https://github.com/yourusername/gemini-cli-wrapper.git
+pip install git+https://github.com/tkhuang/gemini-cli-wrapper.git
 ```
 
 ## Usage
