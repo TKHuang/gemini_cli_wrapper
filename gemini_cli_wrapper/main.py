@@ -1,20 +1,20 @@
 import asyncio
 import json
 import logging
+import os
 import re
-import subprocess
 import time
 import uuid
-from typing import Any, Dict, List, Optional, Union
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from .__about__ import __version__
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
 
 def configure_logging(level: str = "INFO"):
     """Configure logging for the application"""
@@ -35,9 +35,8 @@ def configure_logging(level: str = "INFO"):
 
     logger.info(f"Logging configured at {level.upper()} level")
 
-# Configure logging at module level for development
-import os
 
+# Configure logging at module level for development
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 configure_logging(LOG_LEVEL)
 
@@ -56,26 +55,26 @@ class ChatMessage(BaseModel):
 
 class ChatCompletionRequest(BaseModel):
     model: str = "gemini-2.5-flash"
-    messages: List[ChatMessage]
-    temperature: Optional[float] = 0.7
-    max_tokens: Optional[int] = None
-    stream: Optional[bool] = False
-    top_p: Optional[float] = 1.0
-    frequency_penalty: Optional[float] = 0.0
-    presence_penalty: Optional[float] = 0.0
-    stop: Optional[Union[str, List[str]]] = None
+    messages: list[ChatMessage]
+    temperature: float | None = 0.7
+    max_tokens: int | None = None
+    stream: bool | None = False
+    top_p: float | None = 1.0
+    frequency_penalty: float | None = 0.0
+    presence_penalty: float | None = 0.0
+    stop: str | list[str] | None = None
 
 
 class CompletionRequest(BaseModel):
     model: str = "gemini-2.5-flash"
     prompt: str
-    temperature: Optional[float] = 0.7
-    max_tokens: Optional[int] = None
-    stream: Optional[bool] = False
-    top_p: Optional[float] = 1.0
-    frequency_penalty: Optional[float] = 0.0
-    presence_penalty: Optional[float] = 0.0
-    stop: Optional[Union[str, List[str]]] = None
+    temperature: float | None = 0.7
+    max_tokens: int | None = None
+    stream: bool | None = False
+    top_p: float | None = 1.0
+    frequency_penalty: float | None = 0.0
+    presence_penalty: float | None = 0.0
+    stop: str | list[str] | None = None
 
 
 class ChatCompletionChoice(BaseModel):
@@ -101,7 +100,7 @@ class ChatCompletionResponse(BaseModel):
     object: str = "chat.completion"
     created: int
     model: str
-    choices: List[ChatCompletionChoice]
+    choices: list[ChatCompletionChoice]
     usage: Usage
 
 
@@ -110,7 +109,7 @@ class CompletionResponse(BaseModel):
     object: str = "text_completion"
     created: int
     model: str
-    choices: List[CompletionChoice]
+    choices: list[CompletionChoice]
     usage: Usage
 
 
@@ -123,7 +122,7 @@ class ModelInfo(BaseModel):
 
 class ModelsResponse(BaseModel):
     object: str = "list"
-    data: List[ModelInfo]
+    data: list[ModelInfo]
 
 
 # Helper functions
@@ -176,7 +175,7 @@ async def call_gemini_cli(model: str, prompt: str, **kwargs) -> str:
         logger.debug(
             f"Cleaned output length: {len(cleaned_output)} characters: \n{cleaned_output}"
         )
-        
+
         return cleaned_output
 
     except FileNotFoundError as e:
@@ -192,7 +191,7 @@ async def call_gemini_cli(model: str, prompt: str, **kwargs) -> str:
         ) from e
 
 
-def messages_to_prompt(messages: List[ChatMessage]) -> str:
+def messages_to_prompt(messages: list[ChatMessage]) -> str:
     """Convert OpenAI chat messages format to a single prompt"""
     logger.debug(f"Converting {len(messages)} messages to prompt format")
     prompt_parts = []
@@ -288,29 +287,41 @@ async def create_chat_completion(request: ChatCompletionRequest):
         async def generate_stream():
             # Stream by characters to preserve formatting
             chunk_size = 10  # Stream characters in small chunks
-            logger.debug(f"Streaming {len(response_text)} characters in chunks of {chunk_size}")
-            
-            for i in range(0, len(response_text), chunk_size):
-                chunk = response_text[i:i + chunk_size]
-                is_last = i + chunk_size >= len(response_text)
-                
+            logger.debug(
+                f"Streaming {len(response_text)} characters in chunks of {chunk_size}"
+            )
+
+            if len(response_text) > 0:
+                for i in range(0, len(response_text), chunk_size):
+                    chunk = response_text[i : i + chunk_size]
+                    is_last = i + chunk_size >= len(response_text)
+
+                    chunk_data = {
+                        "id": completion_id,
+                        "object": "chat.completion.chunk",
+                        "created": int(time.time()),
+                        "model": request.model,
+                        "choices": [
+                            {
+                                "index": 0,
+                                "delta": {"content": chunk},
+                                "finish_reason": "stop" if is_last else None,
+                            }
+                        ],
+                    }
+                    yield f"data: {json.dumps(chunk_data)}\n\n"
+                    await asyncio.sleep(0.02)  # Small delay for smooth streaming
+            else:
                 chunk_data = {
                     "id": completion_id,
                     "object": "chat.completion.chunk",
                     "created": int(time.time()),
                     "model": request.model,
                     "choices": [
-                        {
-                            "index": 0,
-                            "delta": {
-                                "content": chunk
-                            },
-                            "finish_reason": "stop" if is_last else None,
-                        }
+                        {"index": 0, "delta": {"content": ""}, "finish_reason": "stop"}
                     ],
                 }
                 yield f"data: {json.dumps(chunk_data)}\n\n"
-                await asyncio.sleep(0.02)  # Small delay for smooth streaming
 
             logger.debug("Finished streaming response")
             yield "data: [DONE]\n\n"
@@ -375,12 +386,14 @@ async def create_completion(request: CompletionRequest):
         async def generate_stream():
             # Stream by characters to preserve formatting
             chunk_size = 10  # Stream characters in small chunks
-            logger.debug(f"Streaming {len(response_text)} characters in chunks of {chunk_size}")
-            
+            logger.debug(
+                f"Streaming {len(response_text)} characters in chunks of {chunk_size}"
+            )
+
             for i in range(0, len(response_text), chunk_size):
-                chunk = response_text[i:i + chunk_size]
+                chunk = response_text[i : i + chunk_size]
                 is_last = i + chunk_size >= len(response_text)
-                
+
                 chunk_data = {
                     "id": completion_id,
                     "object": "text_completion",
