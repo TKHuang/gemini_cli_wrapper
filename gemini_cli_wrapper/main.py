@@ -7,6 +7,7 @@ import time
 import uuid
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -44,6 +45,15 @@ app = FastAPI(
     title="Gemini CLI Wrapper",
     description="OpenAI-compatible API wrapper for Gemini CLI",
     version=__version__,
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
 )
 
 
@@ -160,6 +170,7 @@ async def call_gemini_cli(model: str, prompt: str, **kwargs) -> str:
 
         logger.debug(f"Gemini CLI return code: {result.returncode}")
         logger.debug(f"Gemini CLI stdout length: {len(stdout)} characters")
+        logger.debug(f"Gemini CLI stdout: {stdout}")
         if stderr:
             logger.debug(f"Gemini CLI stderr: {stderr}")
 
@@ -216,18 +227,21 @@ def messages_to_prompt(messages: list[ChatMessage]) -> str:
 def clean_mcp_messages(text: str) -> str:
     """Remove MCP STDERR messages from the output"""
     logger.debug(f"Cleaning MCP messages from text of length: {len(text)}")
-
+    logger.debug(f"Text: {text}")
     # Pattern to match MCP STDERR messages like "MCP STDERR (context7): Context7 Documentation MCP Server running on stdio"
     mcp_pattern = r"MCP STDERR \([^)]+\): [^\n]*\n?"
     cleaned_text = re.sub(mcp_pattern, "", text, flags=re.MULTILINE)
+    logger.debug(f"Cleaned text mcp: {cleaned_text}")
 
     # Remove any standalone "Loaded cached credentials." messages that might appear
     cleaned_text = re.sub(r"Loaded cached credentials\.\s*\n?", "", cleaned_text)
+    logger.debug(f"Cleaned text loaded cached credentials: {cleaned_text}")
 
     # Remove any extra empty lines that might be left
     cleaned_text = re.sub(r"\n\s*\n", "\n\n", cleaned_text)
 
     result = cleaned_text.strip()
+    logger.debug(f"Cleaned text result: {result}")
     logger.debug(f"Cleaned text length: {len(result)} characters")
     return result
 
